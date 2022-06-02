@@ -173,6 +173,8 @@ A fix here would be to have a separate government token, maybe one that requires
 
 
 ### Compromised
+The is the only challenge I wasn't able to solve. 
+
 ### Puppet
 ### Puppet v2
 ### Free rider

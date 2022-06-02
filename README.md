@@ -36,9 +36,24 @@ await this.token.approve(attacker.address, 1);
 this.token.connect(attacker).transfer(this.pool.address, 1);
 ```
 
-This is a good first problem to start understanding flash loans and how smart contracts interact with each other. 
+This is a good first problem to start understanding flash loans and how smart contracts interact with each other. One simple fix would be to change the DVT balance check so that the token balance must be greater than or equal to the poolBalance.
 
 ### Naive receiver
+The objective is to grief another user (contact) of a flash loan contract.
+
+Flash loans are issued with a call to flashLoan providing the borrow address and the amount to borrow. The borrowing contact must implement receiveEther and that function must repay the loan plus a specified fee. 
+
+flashLoan can be called by anyone and specify any borrower address. We can exploit this to force the user contract to take out a flash loan and also pay the loan fee. 
+```js
+await this.pool.flashLoan(this.receiver.address, 1); // The second argument here doesn't matter as long as it's less than ETHER_IN_POOL.
+```
+
+The fee is 1 eth and the user holds 10 eth so we can drain their wallet by simply calling flashLoan on them 10 times. 
+
+The challenge specifies doing this in one transaction. We could do this by deploying our own smart contract and bundling all the flashLoan calls into a single transaction. 
+
+One fix for this is a requirement that flashLoan can only be issued to msg.sender. 
+
 ### Truster
 ### Side entrance
 ### The rewarder

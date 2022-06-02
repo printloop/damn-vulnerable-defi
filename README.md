@@ -48,7 +48,7 @@ flashLoan can be called by anyone and specify any borrower address. We can explo
 await this.pool.flashLoan(this.receiver.address, 1); // The second argument here doesn't matter as long as it's less than ETHER_IN_POOL.
 ```
 
-The fee is 1 eth and the user holds 10 eth so we can drain their wallet by simply calling flashLoan on them 10 times. 
+The fee is 1 ETH and the user holds 10 ETH so we can drain their wallet by simply calling flashLoan on them 10 times. 
 
 The challenge specifies doing this in one transaction. We could do this by deploying our own smart contract and bundling all the flashLoan calls into a single transaction. 
 
@@ -86,8 +86,38 @@ Any time your contract uses functionCall should be seen as a huge window for exp
 
 It would be much safer to require the user contract to implement some function that the loaner contract can then call by name. 
 
-
 ### Side entrance
+
+Another flash loan challenge. Our objective this time is to take all the ETH in the lending pool.
+
+This is the first challenge I actually ended up deploying a smart contract for, since we needed an implementation of IFlashLoanEtherReceiver to run the exploit. 
+
+The flash loan contract has three functions: deposit, withdraw, and flashLoan. Anyone can call any function. Presumably people would deposit ETH for some kind of reward (not relevant) and withdraw their ETH when they want it back. The ETH deposited is used for flash loans.
+
+Since users can withdraw and deposit ETH the contract has to keep track of how much each user has deposited so it knows how much can be withdrawn. Seems reasonable. 
+
+Calls to flashLoan have a few requirements:
+1. The pool must contain enough ETH to be able to fulfill the loan.
+2. The borrower must implement IFlashLoanReceiver.
+3. The total amount of ETH in the contract after the loan is complement must be greater than or equal to the amount before the loan was issued.
+
+Our exploit takes out a flash loan and immediately deposits the borrowed ETH back into loaner contract with a call to deposit. 
+In the end, the pool balance is the same as before the loan, but the attacker is credited with having desposited the ETH. From here the attacker can withdraw all of the pool's ETH. 
+
+```solidity
+function execute() external payable {
+  pool.deposit{value: msg.value}();
+}
+
+function attack(uint256 amount) external {
+  pool.flashLoan(amount);
+  pool.withdraw();
+}
+```
+
+One solution is to instead of doing a balance check at the end, have the loaner contract transfer the amount from the borrower to the loaner itself. This would require the borrower to approve the amount first. This is how AAVE flash loans work. 
+
+
 ### The rewarder
 ### Selfie
 ### Compromised

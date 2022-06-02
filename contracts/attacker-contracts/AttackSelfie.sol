@@ -25,8 +25,6 @@ contract AttackSelfie {
 
   uint256 actionId;
 
-  event IDSet(uint256 id);
-
   constructor(address tokenAddress, address selfieAddress, address governanceAddress) {
     owner = msg.sender;
     token = tokenAddress;
@@ -44,7 +42,6 @@ contract AttackSelfie {
       0);
 
      IERC20(tokenAddress).transfer(selfie, amount);
-     emit IDSet(actionId);
 
   }
 

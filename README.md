@@ -55,6 +55,38 @@ The challenge specifies doing this in one transaction. We could do this by deplo
 One fix for this is a requirement that flashLoan can only be issued to msg.sender. 
 
 ### Truster
+Another flash loan problem but this time we actually get to profit from our exploit. We're going to drain the flash loan protocol's pool. 
+
+Flash loans work via callback. Some contract wants a flash loan and must either specify the callback function that the loaner should call or implement an expected call from the loaner. In this case, the caller gets to specify the contract call. The caller also gets to specify the address of this callback. 
+
+Our exploit takes advantage of the fact thay any target address can be specified and any function can be called. 
+
+```js
+let ABI = ["function approve(address, uint)"];
+let iface = new ethers.utils.Interface(ABI);
+
+await this.pool.flashLoan(
+  0,
+  attacker.address,
+  this.token.address,
+  iface.encodeFunctionData("approve", [attacker.address, TOKENS_IN_POOL])
+);
+```
+Let's go over what's happening with this call to flashLoan.
+borrowAmount is 0, we don't actually need to borrow anything and this let's us bypass all the requirements of paying back the loan. 
+borrower doesn't actually matter since borrowAmount is 0. It just needs to be a valid address. 
+target, this is the address of the DVT token that the pool is composed of.
+data, this is the function call. To exploit this contract we're making this function call "approve" and providing the attacker address plus the number of tokens in the pool.
+
+When we make this call to flashLoan there won't actually be any loan issued. However, the pool contract will make a call to the DVT token's approve function giving the attacker address approval to transfer all the DVD tokens it holds. 
+
+After that the attacker can call transferFrom on the DVT token contract and drain everything. 
+
+Any time your contract uses functionCall should be seen as a huge window for exploits. Use it only as a last resort. 
+
+It would be much safer to require the user contract to implement some function that the loaner contract can then call by name. 
+
+
 ### Side entrance
 ### The rewarder
 ### Selfie

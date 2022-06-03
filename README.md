@@ -289,4 +289,47 @@ function uniswapV2Call(address sender, uint amount0, uint amount1, bytes calldat
 Conceptually this wasn't too difficult but there was a lot of boilerplate code to get right (fee calculation, convering between WETH/ETH, etc). 
 
 ### Backdoor
+
+The objective of this challenge to exploit a registry of Gnosis wallets and steal its funds. 
+
+There's a lot going on here and the hint came when looking at the WalletRegistry.proxyCreated function. This is where the reward tokens are distributed to wallets that register. 
+
+There is a comment that says
+```solidity
+ @notice Function executed when user creates a Gnosis Safe wallet via GnosisSafeProxyFactory::createProxyWithCallback
+             setting the registry's address as the callback.
+ ```
+
+Now we know we are going to need to call this createProxyWithCallback in order to register the beneficiaries. Then we need find a way to take their reward tokens. 
+
+The exploit takes advantage of how the proxy is set up. In the setup call we can specify an address for a fallbackHandler.
+
+Any calls to the contract that don't match an existing function will be called on this address by the contract. 
+
+For our fallbackHander we used the DVT token address. Now we can call approve/transfer on our newly created proxy and it will be as if the contract called token.approve/transfer. 
+
+```solidity
+for (uint i = 0; i < users.length; i++){
+  owners[0] = users[i];
+  bytes memory setup = abi.encodeWithSignature(
+    "setup(address[],uint256,address,bytes,address,address,uint256,address)",
+    owners, 1, address(0), "", token, address(0), 0, address(0)
+  );
+  proxy = ISafe(safe).createProxyWithCallback(
+    master,
+    setup,
+    0,
+    registry
+  );
+  uint256 amount = IERC20(token).balanceOf(address(proxy));
+  proxy.approve(msg.sender, amount);
+  proxy.transfer(msg.sender, amount);
+}
+```
+
+The takeaway here is that proxy calls have the potential to be very dangerous and should be treated accordingly. 
+
+It's important to note that if the registry wallets had already been safely setup this exploit would not be possible. There is no issue at all with the Gnosis code, it's just how we've used it. 
+
+
 ### Climber

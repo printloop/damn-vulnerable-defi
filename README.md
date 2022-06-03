@@ -217,6 +217,13 @@ Fixing the rounding error and not using Uniswap v1 are obvious fixes.
 However, if a whale has a signifant number of tokens relative to the size of an LP this kind of manipulation is still possible. 
 
 ### Puppet v2
+Same objective as the previous challenge with some of the bugs removed.
+
+The strategy is pretty much the same but we need to adjust to using Uniswap v2. 
+
+Still no additional smart contract required unless you want to do it all in one transaction.
+
 ### Free rider
+
 ### Backdoor
 ### Climber

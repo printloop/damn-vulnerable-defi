@@ -333,3 +333,58 @@ It's important to note that if the registry wallets had already been safely setu
 
 
 ### Climber
+
+The objective here is to drain all the funds in a vault. 
+
+The vault contract is upgradeable and owned by a timelock contract that only allows an address with the Proposer role to schedule function execution. 
+
+The vault contains an emergency sweepFunds function that only an address with the Sweeper role can execute. 
+
+This heist will occur in multiple stages
+1) First we will use an exploit to gain the Proposer role 
+2) We will use this role to execute an upgrade to the vault contract. This updgraded contract will have additionaly functionality that lets use reassign the Sweeper role.
+3) Assign the Sweeper role to our attacker's address and sweep the funds.
+
+The upgraded contract functionality is pretty simple. We just need to provide this additional function.
+```solidity
+function setSweeper(address sweeper) external {
+  _setSweeper(sweeper);
+}
+```
+Everything else is inherited from the original vault contract. 
+
+To gain the Proposer role we have to be a bit clever. 
+
+The Timelock contract uses a schedule and execute function to let users run functions on the smart contract.
+
+The Timelock.schedule function can only be run by Proposers but the Timelock.execute function can be run by anyone. 
+
+The Timelock.schedule and Timelock.execute functions both take the same arguments. These arguments are used to calculate the operation ID.  
+
+The execute function checks to make sure this operation ID has been previously scheduled, but only after running the operations requested.
+
+This is considered "safe" because any operations it attempts to run will be reverted unless the operation ID check passes.
+
+To performed the exploit, we're first going to make a call to execute with three instructions.
+1) A call on the timelock contract to updateDelay, setting it to 0.
+2) A call on the timelock contract to grantRole, giving the Proposer role to another smart contract we've already deployed.
+3) A call to "schedule" on our newly made Proposer contract that will complete our exploit.
+
+In this call we in turn make a call to the timelock contract's schedule function. Sine we have the Proposer role this is allowed. 
+
+We can construct our arguments to this call to schedule so that the operation ID saved here is exactly the same as the ID that the original call to execute would have produced. When execute later checks for a matching ID, it will find a match and allow the entire operation to proceed. 
+
+Now we are in control of a smart contract with the Proposer role. 
+
+With this role we can freely schedule an upgrade to the vault contract. The timelock contract is the owner of the vault so it has permission to upgrade the contract at any time. We've also already set the timeDelay to 0 so we can immediately execute the upgrade after scheduling it. 
+
+With the newly upgraded contract available we now have access to the setSweeper function. 
+
+From there we set the sweeper to our attacker's address and can steal the funds.
+
+
+
+
+
+
+
